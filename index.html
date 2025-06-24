@@ -462,9 +462,9 @@
             };
             
             if (date.toDateString() === today.toDateString()) {
-                return `Сегодня (${date.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})})`;
+                return `Сегодня`;
             } else if (date.toDateString() === yesterday.toDateString()) {
-                return `Вчера (${date.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})})`;
+                return `Вчера`;
             } else {
                 return date.toLocaleDateString('ru-RU', options);
             }
@@ -668,6 +668,15 @@
             try {
                 cameras = await Instascan.Camera.getCameras();
                 if (cameras.length > 0) {
+                    // По умолчанию выбираем заднюю камеру, если есть
+                    let backIndex = cameras.findIndex(cam =>
+                        (cam.name && (cam.name.toLowerCase().includes('back') || cam.name.toLowerCase().includes('environment')))
+                    );
+                    if (backIndex === -1 && cameras.length > 1) {
+                        // Иногда на iOS нет явного "back" в названии, пробуем выбрать вторую
+                        backIndex = 1;
+                    }
+                    currentCameraIndex = backIndex !== -1 ? backIndex : 0;
                     return cameras;
                 } else {
                     showNotification('Камеры не найдены');
@@ -801,20 +810,16 @@
                 showNotification('Доступна только одна камера');
                 return;
             }
-            
             try {
+                cameraStatus.style.display = 'block';
+                cameraStatus.innerHTML = `<i class="fas fa-sync fa-spin"></i> Переключение камеры...`;
                 currentCameraIndex = (currentCameraIndex + 1) % cameras.length;
-                
                 if (scanner && scanning) {
-                    cameraStatus.style.display = 'block';
-                    cameraStatus.innerHTML = `<i class="fas fa-sync fa-spin"></i> Переключение камеры...`;
-                    
                     await scanner.stop();
                     await scanner.start(cameras[currentCameraIndex]);
-                    
-                    cameraStatus.style.display = 'none';
-                    showNotification('Камера изменена');
                 }
+                cameraStatus.style.display = 'none';
+                showNotification('Камера изменена');
             } catch (err) {
                 console.error("Ошибка смены камеры:", err);
                 showNotification('Ошибка смены камеры: ' + err.message);

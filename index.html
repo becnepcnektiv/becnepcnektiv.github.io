@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>WHOOSH SERVICE</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://rawgit.com/schmich/instascan-builds/master/instascan.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: #202324;
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+        
+        .container {
+            max-width: 100%;
+            width: 100%;
+            margin: 0 auto;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            max-width: 500px;
+        }
+        
+        header {
+            text-align: center;
+            padding: 15px 0;
+            margin-bottom: 20px;
+            position: relative;
+        }
+        
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        
+        .logo i {
+            background: rgba(255, 255, 255, 0.2);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .app-title {
+            font-size: 1.5rem;
+            margin-bottom: 5px;
+        }
+        
+        .app-subtitle {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            margin-bottom: 15px;
+        }
+        
+        .card {
+            background:#282A2D;
+            border-radius: 32px;
+            padding: 20px;
+            margin-bottom: 20px;
+
+        }
+        
+        .card-title {
+            font-size: 1.2rem;
+            text-align: center;
+        }
+        
+        .input-group {
+            display: flex;
+            margin-bottom: 15px;
+        }
+        
+        .input-group input {
+            flex: 1;
+            padding: 12px 15px;
+            border: none;
+            border-radius: 32px;
+            background: #292B2D;
+            color: white;
+            font-size: 16px;
+            margin-bottom: 12px;
+        }
+        
+        .input-group input::placeholder {
+
+            color: rgba(255, 255, 255, 0.7);
+        }
+        
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 32px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .btn-primary {
+            margin-bottom: 12px;
+            background: #ff8a00;
+            width: 100%;
+        }
+        
+        .btn-scan {
+            background: #3765F9;
+            width: 100%;
+        }
+        
+        .btn-copy {
+            background: transparent;
+        }
+        
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .btn i {
+            font-size: 18px;
+        }
+        
+        .scanner-container {
+            position: relative;
+            margin-top: 15px;
+            display: none;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        #preview {
+            width: 100%;
+            border-radius: 15px;
+            background: #000;
+            aspect-ratio: 1/1;
+            object-fit: cover;
+        }
+        
+        .camera-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .camera-btn {
+            width: 100%;
+        }
+        
+        .camera-status {
+            text-align: center;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            margin-top: 10px;
+            display: none;
+        }
+        
+        .codes-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .day-section {
+            background: #282A2D;
+            border-radius: 24px;
+            padding: 15px;
+            margin-bottom: 10px;
+        }
+        
+        .day-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .day-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            text-align: center;
+        }
+        
+        .codes-list {
+            list-style: none;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        
+        .code-item {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 10px 15px;
+            display: flex;
+            align-items: center;
+            animation: slideIn 0.3s ease;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .code-value {
+            font-weight: bold;
+            font-size: 16px;
+            letter-spacing: 1px;
+        }
+        
+        .code-actions {
+            display: flex;
+            gap: 8px;
+            margin-left: 10px;
+        }
+        
+        .action-btn {
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .edit-btn {
+            background: rgba(255, 193, 7, 0.2);
+            color: #ffc107;
+        }
+        
+        .delete-btn {
+            background: rgba(220, 53, 69, 0.2);
+            color: #dc3545;
+        }
+                
+        .empty-state {
+            text-align: center;
+            padding: 30px 0;
+            opacity: 0.7;
+            background:#2B2E30;
+            border-radius: 32px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .empty-state i {
+            font-size: 48px;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 20px 0;
+            font-size: 0.9rem;
+            opacity: 0.7;
+            margin-top: auto;
+        }
+        
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 12px 25px;
+            border-radius: 50px;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .notification.show {
+            opacity: 1;
+        }
+        
+        .scanner-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1;
+        }
+        
+        @keyframes scan {
+            0% { top: 0; }
+            50% { top: calc(100% - 4px); }
+            100% { top: 0; }
+        }
+        
+        @media (max-width: 480px) {
+            .card {
+                padding: 15px;
+            }
+            
+            .btn {
+                padding: 10px 15px;
+                font-size: 14px;
+            }
+            
+            .code-value {
+                font-size: 15px;
+            }
+            
+            .input-group {
+                flex-direction: column;
+            }
+            
+            .day-title {
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <i class="fa-solid fa-bolt"></i>
+                <div>
+                    <h1 class="app-title">WHOOSH SERVICE</h1>
+                </div>
+            </div>
+        </header>
+        
+        
+        <div class="card">
+            <div class="input-group">
+                <input type="text" id="code-input" placeholder="Введите номер (например, AJ8476)">
+            </div>
+            <button class="btn btn-primary" id="add-btn"><i class="fas fa-plus"></i>Добавить</button>
+            <button class="btn btn-scan" id="scan-btn"><i class="fas fa-camera"></i>Сканировать QR-код</button>
+            
+            <div class="scanner-container" id="scanner-container">
+                <div id="camera-status" class="camera-status">
+                    <i class="fas fa-sync fa-spin"></i> Загрузка камеры...
+                </div>
+                <video id="preview" playsinline></video>
+                <div class="scanner-overlay">
+
+                </div>
+                
+                <div class="camera-controls">
+                    <button class="btn camera-btn" id="switch-camera-btn">
+                        <i class="fas fa-sync"></i> Сменить камеру
+                    </button>
+                    <button class="btn camera-btn" id="stop-scan-btn">
+                        <i class="fas fa-stop"></i> Остановить сканирование
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2 class="card-title">
+                Отсканированные самокаты
+            </h2>
+        </div>
+
+        
+            <div class="empty-state" id="empty-state">
+                <i class="fas fa-inbox"></i>
+                <p>Нет добавленных номеров</p>
+                <p>Начните сканирование или добавьте номер вручную</p>
+            </div>
+        
+
+        <div class="codes-container" id="codes-container">
+                <!-- Секции по дням будут добавляться сюда -->
+        </div>
+        
+        <div class="notification" id="notification">
+            <i class="fas fa-check-circle"></i>
+            <span id="notification-text">Уведомление</span>
+        </div>
+    </div>
+    
+    <footer>
+        <p>Made by Becnepcnektivno</p>
+    </footer>
+
+    <script>
+        // Элементы DOM
+        const codeInput = document.getElementById('code-input');
+        const addBtn = document.getElementById('add-btn');
+        const scanBtn = document.getElementById('scan-btn');
+        const stopScanBtn = document.getElementById('stop-scan-btn');
+        const switchCameraBtn = document.getElementById('switch-camera-btn');
+        const scannerContainer = document.getElementById('scanner-container');
+        const previewElement = document.getElementById('preview');
+        const cameraStatus = document.getElementById('camera-status');
+        const codesContainer = document.getElementById('codes-container');
+        const emptyState = document.getElementById('empty-state');
+        const notification = document.getElementById('notification');
+        const notificationText = document.getElementById('notification-text');
+        
+        // Состояние приложения
+        let codes = JSON.parse(localStorage.getItem('scooter_codes')) || [];
+        let scanner = null;
+        let cameras = [];
+        let currentCameraIndex = 0;
+        let scanning = false;
+        
+        // Форматирование даты
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            const today = new Date();
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            
+            const options = { 
+                day: 'numeric', 
+                month: 'long', 
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            };
+            
+            if (date.toDateString() === today.toDateString()) {
+                return `Сегодня`;
+            } else if (date.toDateString() === yesterday.toDateString()) {
+                return `Вчера`;
+            } else {
+                return date.toLocaleDateString('ru-RU', options);
+            }
+        }
+        
+        // Инициализация приложения
+        function init() {
+            renderCodes();
+            setupEventListeners();
+        }
+        
+        // Настройка обработчиков событий
+        function setupEventListeners() {
+            addBtn.addEventListener('click', addManualCode);
+            codeInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') addManualCode();
+            });
+            
+            scanBtn.addEventListener('click', startScanning);
+            stopScanBtn.addEventListener('click', stopScanning);
+            switchCameraBtn.addEventListener('click', switchCamera);
+        }
+        
+        // Добавление кода вручную
+        function addManualCode() {
+            const code = codeInput.value.trim().toUpperCase();
+            
+            if (!code) {
+                showNotification('Пожалуйста, введите номер');
+                return;
+            }
+            
+            if (codes.some(item => item.code === code)) {
+                showNotification('Этот номер уже добавлен');
+                return;
+            }
+            
+            // Добавляем код с датой
+            const newCode = {
+                code: code,
+                date: new Date().toISOString()
+            };
+            
+            codes.push(newCode);
+            saveCodes();
+            renderCodes();
+            codeInput.value = '';
+            showNotification(`Номер ${code} добавлен`);
+        }
+        
+        // Удаление кода
+        function deleteCode(codeToDelete) {
+            const index = codes.findIndex(item => item.code === codeToDelete);
+            if (index !== -1) {
+                codes.splice(index, 1);
+                saveCodes();
+                renderCodes();
+                showNotification(`Номер ${codeToDelete} удален`);
+            }
+        }
+        
+        // Редактирование кода
+        function editCode(oldCode) {
+            const newCode = prompt('Введите новый номер:', oldCode);
+            
+            if (newCode) {
+                const trimmedCode = newCode.trim().toUpperCase();
+                
+                if (!trimmedCode) {
+                    showNotification('Пожалуйста, введите номер');
+                    return;
+                }
+                
+                if (codes.some(item => item.code === trimmedCode)) {
+                    showNotification('Этот номер уже добавлен');
+                    return;
+                }
+                
+                const index = codes.findIndex(item => item.code === oldCode);
+                if (index !== -1) {
+                    const originalDate = codes[index].date;
+                    codes[index] = {
+                        code: trimmedCode,
+                        date: originalDate
+                    };
+                    saveCodes();
+                    renderCodes();
+                    showNotification(`Номер ${oldCode} изменен на ${trimmedCode}`);
+                }
+            }
+        }
+        
+        // Сохранение кодов в localStorage
+        function saveCodes() {
+            localStorage.setItem('scooter_codes', JSON.stringify(codes));
+        }
+        
+        // Отображение списка кодов по дням
+        function renderCodes() {
+            if (codes.length === 0) {
+                codesContainer.innerHTML = '';
+                emptyState.style.display = 'block';
+                return;
+            }
+            
+            emptyState.style.display = 'none';
+            codesContainer.innerHTML = '';
+            
+            // Группировка кодов по дате (без времени)
+            const grouped = {};
+            codes.forEach(item => {
+                const dateKey = item.date.split('T')[0];
+                if (!grouped[dateKey]) {
+                    grouped[dateKey] = [];
+                }
+                grouped[dateKey].push(item);
+            });
+            
+            // Сортировка дат от новых к старым
+            const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+            
+            // Отрисовка по дням
+            sortedDates.forEach(dateKey => {
+                const dayCodes = grouped[dateKey];
+                
+                const daySection = document.createElement('div');
+                daySection.className = 'day-section';
+                
+                const dayHeader = document.createElement('div');
+                dayHeader.className = 'day-header';
+                
+                const dayTitle = document.createElement('div');
+                dayTitle.className = 'day-title';
+                dayTitle.textContent = formatDate(dateKey);
+                
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'btn btn-copy';
+                copyBtn.innerHTML = '<i class="fas fa-copy"></i>';
+                copyBtn.onclick = () => copyDayCodes(dayCodes);
+                
+                dayHeader.appendChild(dayTitle);
+                dayHeader.appendChild(copyBtn);
+                
+                const codesList = document.createElement('ul');
+                codesList.className = 'codes-list';
+                
+                dayCodes.forEach(item => {
+                    const li = document.createElement('li');
+                    li.className = 'code-item';
+                    li.innerHTML = `
+                        <span class="code-value">${item.code}</span>
+                        <div class="code-actions">
+                            <div class="action-btn edit-btn" data-code="${item.code}">
+                                <i class="fas fa-edit"></i>
+                            </div>
+                            <div class="action-btn delete-btn" data-code="${item.code}">
+                                <i class="fas fa-trash"></i>
+                            </div>
+                        </div>
+                    `;
+                    codesList.appendChild(li);
+                });
+                
+                daySection.appendChild(dayHeader);
+                daySection.appendChild(codesList);
+                codesContainer.appendChild(daySection);
+            });
+            
+            // Добавляем обработчики для кнопок редактирования и удаления
+            document.querySelectorAll('.edit-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const code = e.currentTarget.dataset.code;
+                    editCode(code);
+                });
+            });
+            
+            document.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const code = e.currentTarget.dataset.code;
+                    deleteCode(code);
+                });
+            });
+        }
+        
+        // Копирование номеров за день
+        function copyDayCodes(dayCodes) {
+            const codesText = dayCodes.map(item => item.code).join(', ');
+            
+            navigator.clipboard.writeText(codesText)
+                .then(() => {
+                    showNotification('Номера скопированы в буфер!');
+                })
+                .catch(err => {
+                    console.error('Ошибка копирования: ', err);
+                    showNotification('Не удалось скопировать номера');
+                });
+        }
+        
+        // Получение списка камер
+        async function getCameras() {
+            try {
+                cameras = await Instascan.Camera.getCameras();
+                if (cameras.length > 0) {
+                    return cameras;
+                } else {
+                    showNotification('Камеры не найдены');
+                    return [];
+                }
+            } catch (err) {
+                console.error("Ошибка получения камер:", err);
+                showNotification('Не удалось получить доступ к камерам');
+                return [];
+            }
+        }
+        
+        // Запуск сканирования QR-кода
+        async function startScanning() {
+            if (scanning) return;
+            
+            try {
+                scanBtn.disabled = true;
+                scannerContainer.style.display = 'flex';
+                cameraStatus.style.display = 'block';
+                
+                // Получаем список камер
+                await getCameras();
+                if (cameras.length === 0) {
+                    stopScanning();
+                    return;
+                }
+                
+                // Создаем сканер
+                scanner = new Instascan.Scanner({
+                    video: previewElement,
+                    mirror: false,
+                    captureImage: false,
+                    backgroundScan: true,
+                    refractoryPeriod: 5000,
+                    scanPeriod: 1
+                });
+                
+                // Обработка отсканированных кодов
+                scanner.addListener('scan', function(content) {
+                    processScannedCode(content);
+                });
+                
+                // Запускаем сканирование с выбранной камерой
+                await scanner.start(cameras[currentCameraIndex]);
+                
+                scanning = true;
+                cameraStatus.style.display = 'none';
+                showNotification('Сканирование начато');
+                
+            } catch (err) {
+                console.error("Ошибка сканирования:", err);
+                showNotification('Ошибка запуска камеры: ' + err.message);
+                stopScanning();
+            } finally {
+                scanBtn.disabled = false;
+            }
+        }
+        
+        // Обработка отсканированного кода
+        function processScannedCode(content) {
+            try {
+                // Парсим URL и извлекаем параметр s
+                const url = new URL(content);
+                const code = url.searchParams.get('s');
+                
+                // Проверяем, что домен соответствует wsh.bike
+                if (!url.hostname.endsWith('wsh.bike')) {
+                    showNotification('Неверный QR-код');
+                    return;
+                }
+
+                if (!code) {
+                    showNotification('Неверный QR-код');
+                    return;
+                }
+                
+                const formattedCode = code.trim().toUpperCase();
+                
+                if (codes.some(item => item.code === formattedCode)) {
+                    showNotification('Этот номер уже добавлен');
+                    return;
+                }
+                
+                // Добавляем код с датой
+                const newCode = {
+                    code: formattedCode,
+                    date: new Date().toISOString()
+                };
+                
+                codes.push(newCode);
+                saveCodes();
+                renderCodes();
+                showNotification(`Номер ${formattedCode} добавлен`);
+                
+                // Воспроизводим звук успешного сканирования
+                playScanSound();
+                
+            } catch (e) {
+                console.error("Ошибка обработки QR-кода:", e);
+                showNotification('Неверный формат QR-кода');
+            }
+        }
+        
+        // Воспроизведение звука сканирования
+        function playScanSound() {
+            try {
+                const context = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = context.createOscillator();
+                oscillator.type = 'sine';
+                oscillator.frequency.value = 800;
+                
+                const gain = context.createGain();
+                gain.gain.value = 0.3;
+                
+                oscillator.connect(gain);
+                gain.connect(context.destination);
+                
+                oscillator.start();
+                setTimeout(() => {
+                    oscillator.stop();
+                }, 100);
+            } catch (e) {
+                console.log('Не удалось воспроизвести звук', e);
+            }
+        }
+        
+        // Смена камеры
+        async function switchCamera() {
+            if (cameras.length < 2) {
+                showNotification('Доступна только одна камера');
+                return;
+            }
+            
+            try {
+                currentCameraIndex = (currentCameraIndex + 1) % cameras.length;
+                
+                if (scanner && scanning) {
+                    cameraStatus.style.display = 'block';
+                    cameraStatus.innerHTML = `<i class="fas fa-sync fa-spin"></i> Переключение камеры...`;
+                    
+                    await scanner.stop();
+                    await scanner.start(cameras[currentCameraIndex]);
+                    
+                    cameraStatus.style.display = 'none';
+                    showNotification('Камера изменена');
+                }
+            } catch (err) {
+                console.error("Ошибка смены камеры:", err);
+                showNotification('Ошибка смены камеры: ' + err.message);
+            }
+        }
+        
+        // Остановка сканирования
+        async function stopScanning() {
+            try {
+                if (scanner) {
+                    await scanner.stop();
+                    scanner = null;
+                }
+            } catch (err) {
+                console.error("Ошибка остановки сканирования:", err);
+            } finally {
+                scanning = false;
+                scannerContainer.style.display = 'none';
+                scanBtn.style.display = 'block';
+                cameraStatus.style.display = 'none';
+                scanBtn.disabled = false;
+            }
+        }
+        
+        // Показать уведомление
+        function showNotification(message) {
+            notificationText.textContent = message;
+            notification.classList.add('show');
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+        
+        // Инициализация приложения при загрузке
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

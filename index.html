@@ -462,9 +462,9 @@
             };
             
             if (date.toDateString() === today.toDateString()) {
-                return `Сегодня`;
+                return `Сегодня (${date.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})})`;
             } else if (date.toDateString() === yesterday.toDateString()) {
-                return `Вчера`;
+                return `Вчера (${date.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})})`;
             } else {
                 return date.toLocaleDateString('ru-RU', options);
             }

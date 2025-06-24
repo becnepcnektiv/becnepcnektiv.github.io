@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>WHOOSH SERVICE</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://rawgit.com/schmich/instascan-builds/master/instascan.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         * {
             margin: 0;
@@ -161,7 +161,7 @@
             aspect-ratio: 1/1;
             object-fit: cover;
         }
-        
+
         .camera-controls {
             display: flex;
             flex-direction: column;
@@ -367,155 +367,300 @@
                 </div>
             </div>
         </header>
-        
-        
+
         <div class="card">
             <div class="input-group">
                 <input type="text" id="code-input" placeholder="Введите номер (например, AJ8476)">
             </div>
             <button class="btn btn-primary" id="add-btn"><i class="fas fa-plus"></i>Добавить</button>
             <button class="btn btn-scan" id="scan-btn"><i class="fas fa-camera"></i>Сканировать QR-код</button>
-            
-            <div class="scanner-container" id="scanner-container">
-                <div id="camera-status" class="camera-status">
-                    <i class="fas fa-sync fa-spin"></i> Загрузка камеры...
-                </div>
-                <video id="preview" playsinline></video>
-                <div class="scanner-overlay">
 
-                </div>
-                
-                <div class="camera-controls">
-                    <button class="btn camera-btn" id="switch-camera-btn">
-                        <i class="fas fa-sync"></i> Сменить камеру
-                    </button>
-                    <button class="btn camera-btn" id="stop-scan-btn">
-                        <i class="fas fa-stop"></i> Остановить сканирование
-                    </button>
-                </div>
-            </div>
+    <div class="scanner-container" id="scanner-container">
+        <div id="camera-status" class="camera-status">
+            <i class="fas fa-sync fa-spin"></i> Загрузка камеры...
         </div>
-        
+        <div id="preview"></div>
+        <div class="scanner-overlay"></div>
+        <div class="camera-controls">
+            <button class="btn camera-btn" id="switch-camera-btn">
+                <i class="fas fa-sync"></i> Сменить камеру
+            </button>
+            <button class="btn camera-btn" id="stop-scan-btn">
+                <i class="fas fa-stop"></i> Остановить сканирование
+            </button>
+        </div>
+    </div>
+        </div>
+
         <div class="card">
             <h2 class="card-title">
                 Отсканированные самокаты
             </h2>
         </div>
 
-        
-            <div class="empty-state" id="empty-state">
-                <i class="fas fa-inbox"></i>
-                <p>Нет добавленных номеров</p>
-                <p>Начните сканирование или добавьте номер вручную</p>
-            </div>
-        
-
-        <div class="codes-container" id="codes-container">
-                <!-- Секции по дням будут добавляться сюда -->
+        <div class="empty-state" id="empty-state">
+            <i class="fas fa-inbox"></i>
+            <p>Нет добавленных номеров</p>
+            <p>Начните сканирование или добавьте номер вручную</p>
         </div>
-        
+
+        <div class="codes-container" id="codes-container"></div>
+
         <div class="notification" id="notification">
             <i class="fas fa-check-circle"></i>
             <span id="notification-text">Уведомление</span>
         </div>
     </div>
-    
+
     <footer>
         <p>Made by Becnepcnektivno</p>
     </footer>
 
     <script>
-        // Элементы DOM
         const codeInput = document.getElementById('code-input');
         const addBtn = document.getElementById('add-btn');
         const scanBtn = document.getElementById('scan-btn');
         const stopScanBtn = document.getElementById('stop-scan-btn');
         const switchCameraBtn = document.getElementById('switch-camera-btn');
         const scannerContainer = document.getElementById('scanner-container');
-        const previewElement = document.getElementById('preview');
         const cameraStatus = document.getElementById('camera-status');
         const codesContainer = document.getElementById('codes-container');
         const emptyState = document.getElementById('empty-state');
         const notification = document.getElementById('notification');
         const notificationText = document.getElementById('notification-text');
-        
-        // Состояние приложения
-        let codes = JSON.parse(localStorage.getItem('scooter_codes')) || [];
-        let scanner = null;
-        let cameras = [];
-        let currentCameraIndex = 0;
+
+        let html5QrCode = null;
+        let currentCameraId = null;
+        let cameraList = [];
         let scanning = false;
-        
-        // Форматирование даты
+        let scanCooldown = false;
+
+        let codes = JSON.parse(localStorage.getItem('scooter_codes')) || [];
+
         function formatDate(dateString) {
             const date = new Date(dateString);
             const today = new Date();
             const yesterday = new Date(today);
             yesterday.setDate(yesterday.getDate() - 1);
-            
-            const options = { 
-                day: 'numeric', 
-                month: 'long', 
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            };
-            
-            if (date.toDateString() === today.toDateString()) {
-                return `Сегодня`;
-            } else if (date.toDateString() === yesterday.toDateString()) {
-                return `Вчера`;
-            } else {
-                return date.toLocaleDateString('ru-RU', options);
-            }
+
+            const options = { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' };
+
+            if (date.toDateString() === today.toDateString()) return `Сегодня`;
+            if (date.toDateString() === yesterday.toDateString()) return `Вчера`;
+            return date.toLocaleDateString('ru-RU', options);
         }
-        
-        // Инициализация приложения
+
         function init() {
             renderCodes();
             setupEventListeners();
         }
-        
-        // Настройка обработчиков событий
+
         function setupEventListeners() {
             addBtn.addEventListener('click', addManualCode);
-            codeInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') addManualCode();
-            });
-            
+            codeInput.addEventListener('keypress', e => { if (e.key === 'Enter') addManualCode(); });
             scanBtn.addEventListener('click', startScanning);
             stopScanBtn.addEventListener('click', stopScanning);
             switchCameraBtn.addEventListener('click', switchCamera);
         }
-        
-        // Добавление кода вручную
+
         function addManualCode() {
             const code = codeInput.value.trim().toUpperCase();
-            
-            if (!code) {
-                showNotification('Пожалуйста, введите номер');
-                return;
-            }
-            
-            if (codes.some(item => item.code === code)) {
-                showNotification('Этот номер уже добавлен');
-                return;
-            }
-            
-            // Добавляем код с датой
-            const newCode = {
-                code: code,
-                date: new Date().toISOString()
-            };
-            
+            if (!code) return showNotification('Пожалуйста, введите номер');
+            if (codes.some(item => item.code === code)) return showNotification('Этот номер уже добавлен');
+
+            const newCode = { code, date: new Date().toISOString() };
             codes.push(newCode);
             saveCodes();
             renderCodes();
             codeInput.value = '';
             showNotification(`Номер ${code} добавлен`);
+            playScanSound();
         }
-        
-        // Удаление кода
+
+        function saveCodes() {
+            localStorage.setItem('scooter_codes', JSON.stringify(codes));
+        }
+
+        function renderCodes() {
+            if (codes.length === 0) {
+                codesContainer.innerHTML = '';
+                emptyState.style.display = 'block';
+                return;
+            }
+            emptyState.style.display = 'none';
+            codesContainer.innerHTML = '';
+
+            const grouped = {};
+            codes.forEach(item => {
+                const dateKey = item.date.split('T')[0];
+                if (!grouped[dateKey]) grouped[dateKey] = [];
+                grouped[dateKey].push(item);
+            });
+
+            const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+
+            sortedDates.forEach(dateKey => {
+                const dayCodes = grouped[dateKey];
+
+                const daySection = document.createElement('div');
+                daySection.className = 'day-section';
+
+                const dayHeader = document.createElement('div');
+                dayHeader.className = 'day-header';
+
+                const dayTitle = document.createElement('div');
+                dayTitle.className = 'day-title';
+                dayTitle.textContent = formatDate(dateKey);
+
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'btn btn-copy';
+                copyBtn.innerHTML = '<i class="fas fa-copy"></i>';
+                copyBtn.onclick = () => copyDayCodes(dayCodes);
+
+                dayHeader.appendChild(dayTitle);
+                dayHeader.appendChild(copyBtn);
+
+                const codesList = document.createElement('ul');
+                codesList.className = 'codes-list';
+
+                dayCodes.forEach(item => {
+                    const li = document.createElement('li');
+                    li.className = 'code-item';
+                    li.innerHTML = `
+                        <span class="code-value">${item.code}</span>
+                        <div class="code-actions">
+                            <div class="action-btn edit-btn" data-code="${item.code}"><i class="fas fa-edit"></i></div>
+                            <div class="action-btn delete-btn" data-code="${item.code}"><i class="fas fa-trash"></i></div>
+                        </div>
+                    `;
+                    codesList.appendChild(li);
+                });
+
+                daySection.appendChild(dayHeader);
+                daySection.appendChild(codesList);
+                codesContainer.appendChild(daySection);
+            });
+
+            document.querySelectorAll('.edit-btn').forEach(btn => {
+                btn.addEventListener('click', e => editCode(e.currentTarget.dataset.code));
+            });
+            document.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.addEventListener('click', e => deleteCode(e.currentTarget.dataset.code));
+            });
+        }
+
+        function copyDayCodes(dayCodes) {
+            const codesText = dayCodes.map(item => item.code).join(', ');
+            navigator.clipboard.writeText(codesText)
+                .then(() => showNotification('Номера скопированы в буфер!'))
+                .catch(() => showNotification('Не удалось скопировать номера'));
+        }
+
+        async function startScanning() {
+            if (scanning) return;
+            scanBtn.disabled = true;
+            scannerContainer.style.display = 'flex';
+            cameraStatus.style.display = 'block';
+            cameraStatus.innerHTML = `<i class="fas fa-sync fa-spin"></i> Загрузка камеры...`;
+            try {
+                const devices = await Html5Qrcode.getCameras();
+                if (devices.length === 0) return showNotification('Камеры не найдены');
+                cameraList = devices;
+                currentCameraId = devices[0].id;
+                html5QrCode = new Html5Qrcode("preview");
+                await html5QrCode.start(currentCameraId, 
+                { fps: 30, qrbox: { width: 200, height: 200, aspectRatio: 1,},
+                videoConstraints: {
+                    facingMode: "environment",
+                    advanced: [{ focusMode: "continuous" }]
+                    }
+                }, 
+                processScannedCode);
+                scanning = true;
+                cameraStatus.style.display = 'none';
+                showNotification('Сканирование начато');
+            } catch (err) {
+                console.error(err);
+                showNotification('Ошибка запуска камеры: ' + err.message);
+                stopScanning();
+            } finally {
+                scanBtn.disabled = false;
+            }
+        }
+
+        async function stopScanning() {
+            if (html5QrCode) {
+                await html5QrCode.stop();
+                await html5QrCode.clear();
+                html5QrCode = null;
+            }
+            scanning = false;
+            scannerContainer.style.display = 'none';
+            scanBtn.disabled = false;
+        }
+
+        async function switchCamera() {
+            if (!cameraList || cameraList.length < 2) return showNotification('Доступна только одна камера');
+            const currentIndex = cameraList.findIndex(c => c.id === currentCameraId);
+            const nextIndex = (currentIndex + 1) % cameraList.length;
+            currentCameraId = cameraList[nextIndex].id;
+            if (scanning && html5QrCode) {
+                await html5QrCode.stop();
+                await html5QrCode.start(currentCameraId, { fps: 30, qrbox: { width: 200, height: 200 } }, processScannedCode);
+                showNotification('Камера переключена');
+            }
+        }
+
+        function playScanSound() {
+            try {
+                const context = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = context.createOscillator();
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(880, context.currentTime);
+
+                const gain = context.createGain();
+                gain.gain.setValueAtTime(0.2, context.currentTime);
+
+                oscillator.connect(gain);
+                gain.connect(context.destination);
+
+                oscillator.start();
+                setTimeout(() => oscillator.stop(), 120);
+            } catch (e) {
+                console.warn('Ошибка воспроизведения звука:', e);
+            }
+        }
+
+        function vibrateSuccess() {
+            if (navigator.vibrate) {
+                navigator.vibrate(200);
+            }
+        }
+
+        function processScannedCode(content) {
+            
+            if (scanCooldown) return;
+            scanCooldown = true;
+            setTimeout(() => { scanCooldown = false; }, 1500); // 1.5 секунды задержки
+
+            try {
+                const url = new URL(content);
+                const code = url.searchParams.get('s');
+                if (!url.hostname.endsWith('wsh.bike') || !code) return showNotification('Неверный QR-код');
+                const formattedCode = code.trim().toUpperCase();
+                if (codes.some(item => item.code === formattedCode)) return showNotification('Этот номер уже добавлен');
+                codes.push({ code: formattedCode, date: new Date().toISOString() });
+                saveCodes();
+                renderCodes();
+                showNotification(`Номер ${formattedCode} добавлен`);
+                playScanSound();
+                vibrateSuccess();
+            } catch (e) {
+                console.error(e);
+                showNotification('Неверный формат QR-кода');
+            }
+        }
+
         function deleteCode(codeToDelete) {
             const index = codes.findIndex(item => item.code === codeToDelete);
             if (index !== -1) {
@@ -525,336 +670,29 @@
                 showNotification(`Номер ${codeToDelete} удален`);
             }
         }
-        
-        // Редактирование кода
+
         function editCode(oldCode) {
             const newCode = prompt('Введите новый номер:', oldCode);
-            
             if (newCode) {
                 const trimmedCode = newCode.trim().toUpperCase();
-                
-                if (!trimmedCode) {
-                    showNotification('Пожалуйста, введите номер');
-                    return;
-                }
-                
-                if (codes.some(item => item.code === trimmedCode)) {
-                    showNotification('Этот номер уже добавлен');
-                    return;
-                }
-                
+                if (!trimmedCode) return showNotification('Пожалуйста, введите номер');
+                if (codes.some(item => item.code === trimmedCode)) return showNotification('Этот номер уже добавлен');
                 const index = codes.findIndex(item => item.code === oldCode);
                 if (index !== -1) {
-                    const originalDate = codes[index].date;
-                    codes[index] = {
-                        code: trimmedCode,
-                        date: originalDate
-                    };
+                    codes[index] = { code: trimmedCode, date: codes[index].date };
                     saveCodes();
                     renderCodes();
                     showNotification(`Номер ${oldCode} изменен на ${trimmedCode}`);
                 }
             }
         }
-        
-        // Сохранение кодов в localStorage
-        function saveCodes() {
-            localStorage.setItem('scooter_codes', JSON.stringify(codes));
-        }
-        
-        // Отображение списка кодов по дням
-        function renderCodes() {
-            if (codes.length === 0) {
-                codesContainer.innerHTML = '';
-                emptyState.style.display = 'block';
-                return;
-            }
-            
-            emptyState.style.display = 'none';
-            codesContainer.innerHTML = '';
-            
-            // Группировка кодов по дате (без времени)
-            const grouped = {};
-            codes.forEach(item => {
-                const dateKey = item.date.split('T')[0];
-                if (!grouped[dateKey]) {
-                    grouped[dateKey] = [];
-                }
-                grouped[dateKey].push(item);
-            });
-            
-            // Сортировка дат от новых к старым
-            const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
-            
-            // Отрисовка по дням
-            sortedDates.forEach(dateKey => {
-                const dayCodes = grouped[dateKey];
-                
-                const daySection = document.createElement('div');
-                daySection.className = 'day-section';
-                
-                const dayHeader = document.createElement('div');
-                dayHeader.className = 'day-header';
-                
-                const dayTitle = document.createElement('div');
-                dayTitle.className = 'day-title';
-                dayTitle.textContent = formatDate(dateKey);
-                
-                const copyBtn = document.createElement('button');
-                copyBtn.className = 'btn btn-copy';
-                copyBtn.innerHTML = '<i class="fas fa-copy"></i>';
-                copyBtn.onclick = () => copyDayCodes(dayCodes);
-                
-                dayHeader.appendChild(dayTitle);
-                dayHeader.appendChild(copyBtn);
-                
-                const codesList = document.createElement('ul');
-                codesList.className = 'codes-list';
-                
-                dayCodes.forEach(item => {
-                    const li = document.createElement('li');
-                    li.className = 'code-item';
-                    li.innerHTML = `
-                        <span class="code-value">${item.code}</span>
-                        <div class="code-actions">
-                            <div class="action-btn edit-btn" data-code="${item.code}">
-                                <i class="fas fa-edit"></i>
-                            </div>
-                            <div class="action-btn delete-btn" data-code="${item.code}">
-                                <i class="fas fa-trash"></i>
-                            </div>
-                        </div>
-                    `;
-                    codesList.appendChild(li);
-                });
-                
-                daySection.appendChild(dayHeader);
-                daySection.appendChild(codesList);
-                codesContainer.appendChild(daySection);
-            });
-            
-            // Добавляем обработчики для кнопок редактирования и удаления
-            document.querySelectorAll('.edit-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    const code = e.currentTarget.dataset.code;
-                    editCode(code);
-                });
-            });
-            
-            document.querySelectorAll('.delete-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    const code = e.currentTarget.dataset.code;
-                    deleteCode(code);
-                });
-            });
-        }
-        
-        // Копирование номеров за день
-        function copyDayCodes(dayCodes) {
-            const codesText = dayCodes.map(item => item.code).join(', ');
-            
-            navigator.clipboard.writeText(codesText)
-                .then(() => {
-                    showNotification('Номера скопированы в буфер!');
-                })
-                .catch(err => {
-                    console.error('Ошибка копирования: ', err);
-                    showNotification('Не удалось скопировать номера');
-                });
-        }
-        
-        // Получение списка камер
-        async function getCameras() {
-            try {
-                cameras = await Instascan.Camera.getCameras();
-                if (cameras.length > 0) {
-                    // По умолчанию выбираем заднюю камеру, если есть
-                    let backIndex = cameras.findIndex(cam =>
-                        (cam.name && (cam.name.toLowerCase().includes('back') || cam.name.toLowerCase().includes('environment')))
-                    );
-                    if (backIndex === -1 && cameras.length > 1) {
-                        // Иногда на iOS нет явного "back" в названии, пробуем выбрать вторую
-                        backIndex = 1;
-                    }
-                    currentCameraIndex = backIndex !== -1 ? backIndex : 0;
-                    return cameras;
-                } else {
-                    showNotification('Камеры не найдены');
-                    return [];
-                }
-            } catch (err) {
-                console.error("Ошибка получения камер:", err);
-                showNotification('Не удалось получить доступ к камерам');
-                return [];
-            }
-        }
-        
-        // Запуск сканирования QR-кода
-        async function startScanning() {
-            if (scanning) return;
-            
-            try {
-                scanBtn.disabled = true;
-                scannerContainer.style.display = 'flex';
-                cameraStatus.style.display = 'block';
-                
-                // Получаем список камер
-                await getCameras();
-                if (cameras.length === 0) {
-                    stopScanning();
-                    return;
-                }
-                
-                // Создаем сканер
-                scanner = new Instascan.Scanner({
-                    video: previewElement,
-                    mirror: false,
-                    captureImage: false,
-                    backgroundScan: true,
-                    refractoryPeriod: 5000,
-                    scanPeriod: 1
-                });
-                
-                // Обработка отсканированных кодов
-                scanner.addListener('scan', function(content) {
-                    processScannedCode(content);
-                });
-                
-                // Запускаем сканирование с выбранной камерой
-                await scanner.start(cameras[currentCameraIndex]);
-                
-                scanning = true;
-                cameraStatus.style.display = 'none';
-                showNotification('Сканирование начато');
-                
-            } catch (err) {
-                console.error("Ошибка сканирования:", err);
-                showNotification('Ошибка запуска камеры: ' + err.message);
-                stopScanning();
-            } finally {
-                scanBtn.disabled = false;
-            }
-        }
-        
-        // Обработка отсканированного кода
-        function processScannedCode(content) {
-            try {
-                // Парсим URL и извлекаем параметр s
-                const url = new URL(content);
-                const code = url.searchParams.get('s');
-                
-                // Проверяем, что домен соответствует wsh.bike
-                if (!url.hostname.endsWith('wsh.bike')) {
-                    showNotification('Неверный QR-код');
-                    return;
-                }
 
-                if (!code) {
-                    showNotification('Неверный QR-код');
-                    return;
-                }
-                
-                const formattedCode = code.trim().toUpperCase();
-                
-                if (codes.some(item => item.code === formattedCode)) {
-                    showNotification('Этот номер уже добавлен');
-                    return;
-                }
-                
-                // Добавляем код с датой
-                const newCode = {
-                    code: formattedCode,
-                    date: new Date().toISOString()
-                };
-                
-                codes.push(newCode);
-                saveCodes();
-                renderCodes();
-                showNotification(`Номер ${formattedCode} добавлен`);
-                
-                // Воспроизводим звук успешного сканирования
-                playScanSound();
-                
-            } catch (e) {
-                console.error("Ошибка обработки QR-кода:", e);
-                showNotification('Неверный формат QR-кода');
-            }
-        }
-        
-        // Воспроизведение звука сканирования
-        function playScanSound() {
-            try {
-                const context = new (window.AudioContext || window.webkitAudioContext)();
-                const oscillator = context.createOscillator();
-                oscillator.type = 'sine';
-                oscillator.frequency.value = 800;
-                
-                const gain = context.createGain();
-                gain.gain.value = 0.3;
-                
-                oscillator.connect(gain);
-                gain.connect(context.destination);
-                
-                oscillator.start();
-                setTimeout(() => {
-                    oscillator.stop();
-                }, 100);
-            } catch (e) {
-                console.log('Не удалось воспроизвести звук', e);
-            }
-        }
-        
-        // Смена камеры
-        async function switchCamera() {
-            if (cameras.length < 2) {
-                showNotification('Доступна только одна камера');
-                return;
-            }
-            try {
-                cameraStatus.style.display = 'block';
-                cameraStatus.innerHTML = `<i class="fas fa-sync fa-spin"></i> Переключение камеры...`;
-                currentCameraIndex = (currentCameraIndex + 1) % cameras.length;
-                if (scanner && scanning) {
-                    await scanner.stop();
-                    await scanner.start(cameras[currentCameraIndex]);
-                }
-                cameraStatus.style.display = 'none';
-                showNotification('Камера изменена');
-            } catch (err) {
-                console.error("Ошибка смены камеры:", err);
-                showNotification('Ошибка смены камеры: ' + err.message);
-            }
-        }
-        
-        // Остановка сканирования
-        async function stopScanning() {
-            try {
-                if (scanner) {
-                    await scanner.stop();
-                    scanner = null;
-                }
-            } catch (err) {
-                console.error("Ошибка остановки сканирования:", err);
-            } finally {
-                scanning = false;
-                scannerContainer.style.display = 'none';
-                scanBtn.style.display = 'block';
-                cameraStatus.style.display = 'none';
-                scanBtn.disabled = false;
-            }
-        }
-        
-        // Показать уведомление
         function showNotification(message) {
             notificationText.textContent = message;
             notification.classList.add('show');
-            
-            setTimeout(() => {
-                notification.classList.remove('show');
-            }, 3000);
+            setTimeout(() => notification.classList.remove('show'), 3000);
         }
-        
-        // Инициализация приложения при загрузке
+
         window.addEventListener('DOMContentLoaded', init);
     </script>
 </body>
